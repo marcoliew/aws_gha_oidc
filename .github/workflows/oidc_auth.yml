@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   call_reusable_workflow:
-    uses: marcoliew/reusable_gha_wf/.github/workflows/aws-oidc-auth.yml@main
+    uses: marcoliew/reusable_gha_wf/.github/workflows/aws-oidc-auth.yml@latest
     with:
       aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}
       aws_region: ap-southeast-1
