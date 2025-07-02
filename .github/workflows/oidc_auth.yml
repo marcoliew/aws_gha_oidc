@@ -14,12 +14,16 @@ permissions:
   contents: read    # This is required for actions/checkout
 
 jobs:
-  call_reusable_workflow:
+  # call_reusable:
+  #   uses: marcoliew/reusable_gha_wf/.github/workflows/aws-oidc-auth.yml@main
+  #   secrets:
+  #     aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}
+  auth:
     uses: marcoliew/reusable_gha_wf/.github/workflows/aws-oidc-auth.yml@main
-    with:
-      aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}
-      aws_region: ap-southeast-1
-    secrets: inherit  # Or specify individual secrets
+    secrets:
+      aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}  # ← Secret passed correctly
+  # aws_region: ap-southeast-1
+  # secrets: inherit  # Or specify individual secrets
 
   # deploy:
   #   runs-on: ubuntu-latest
