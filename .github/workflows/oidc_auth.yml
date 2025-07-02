@@ -1,0 +1,15 @@
+permissions:
+  id-token: write   # This is required for OIDC
+  contents: read    # This is required for actions/checkout
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::058264095432:role/GHA-Trust
+          aws-region: ap-southeast-2
+      
+      # Your deployment steps here
