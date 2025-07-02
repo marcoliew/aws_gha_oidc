@@ -33,9 +33,9 @@ jobs:
           echo "=== S3 Buckets ==="
           aws s3 ls
 
-      # 3. Add your deployment steps here
-      # - name: Deploy
-      #   run: ./deploy.sh
+      # 3. Add your test steps here
+      - name: Run Script
+        run: ./get.sh
 
 # jobs:
 #   # call_reusable:
