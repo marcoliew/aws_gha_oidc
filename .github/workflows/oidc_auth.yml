@@ -3,6 +3,11 @@ name: AWS OIDC Authentication
 on:
   push:
     branches: [ main ]  # or your preferred branch
+  
+  # Optional: also trigger on pull requests
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:   # Adds manual trigger option
 
 permissions:
   id-token: write   # This is required for OIDC
