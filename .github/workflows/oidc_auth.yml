@@ -35,7 +35,7 @@ jobs:
 
       # 3. Add your test steps here
       - name: Run Script
-        run: ./get.sh
+        run: ./scripts/get.sh
 
 # jobs:
 #   # call_reusable:
