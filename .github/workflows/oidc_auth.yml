@@ -33,6 +33,9 @@ jobs:
           echo "=== S3 Buckets ==="
           aws s3 ls
 
+      - name: Make script executable
+        run: chmod +x ./scripts/get.sh  # ← Correct path
+
       # 3. Add your test steps here
       - name: Run Script
         run: ./scripts/get.sh
