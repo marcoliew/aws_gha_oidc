@@ -24,6 +24,10 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ap-southeast-2
 
+                # Environment variable for the workspace path
+      - name: Set workspace
+        run: echo "WORKSPACE=$(pwd)" >> $GITHUB_ENV
+
       # 2. Verification Steps
       - name: Verify AWS Access
         run: |
@@ -43,8 +47,8 @@ jobs:
       # 4. Make executable and run
       - name: Execute test script
         run: |
-          chmod +x ./scripts/get.sh
-          ./scripts/get.sh
+          chmod +x ${{ env.WORKSPACE }}/scripts/get.sh
+          ${{ env.WORKSPACE }}/scripts/get.sh
 
 # jobs:
 #   # call_reusable:
