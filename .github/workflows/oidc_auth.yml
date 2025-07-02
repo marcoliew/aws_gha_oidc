@@ -36,12 +36,31 @@ jobs:
           echo "=== S3 Buckets ==="
           aws s3 ls
 
-      - name: Make script executable
-        run: chmod +x ./scripts/get.sh  # ← Correct path
+      # 2. Verify script exists with correct format
+      - name: Inspect script
+        run: |
+          echo "=== File Info ==="
+          file ./scripts/get.sh
+          echo "=== Line Endings ==="
+          cat -A ./scripts/get.sh | head -2
+          echo "=== Permissions ==="
+          stat -c "%a %n" ./scripts/get.sh
 
-      # 3. Add your test steps here
-      - name: Run Script
-        run: ./scripts/get.sh
+      # 3. Force Unix format and permissions
+      - name: Normalize script
+        run: |
+          dos2unix ./scripts/get.sh  # Convert line endings if needed
+          chmod +x ./scripts/get.sh
+          # Verify final state
+          file ./scripts/get.sh
+
+      # 4. Run with full debugging
+      - name: Execute script
+        run: |
+          echo "=== Environment ==="
+          printenv | sort
+          echo "=== Script Output ==="
+          ./scripts/get.sh
 
 # jobs:
 #   # call_reusable:
