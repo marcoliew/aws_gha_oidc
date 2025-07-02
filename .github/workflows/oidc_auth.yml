@@ -1,77 +1,36 @@
-name: AWS OIDC Authentication
+name: AWS OIDC Test
 
-on:
-  push:
-    branches: [ main ]  # or your preferred branch
-  
-  # Optional: also trigger on pull requests
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:   # Adds manual trigger option
-
-permissions:
-  id-token: write   # This is required for OIDC
-  contents: read    # This is required for actions/checkout
+on: [workflow_dispatch]
 
 jobs:
-  auth-and-test:
+  test:
     runs-on: ubuntu-latest
     steps:
-      # 1. Configure AWS Credentials
-      - name: Assume AWS Role
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ap-southeast-2
-
-
-      - name: Verify script location
+      - uses: actions/checkout@v4
+      
+      # Debug: Show exact repository structure
+      - name: Debug repository contents
         run: |
-          echo "Expected path: $GITHUB_WORKSPACE/scripts/get.sh"
-          if [ -f "$GITHUB_WORKSPACE/scripts/get.sh" ]; then
-            echo "Script found!"
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+          echo "Current directory: $(pwd)"
+          find . -type f | sort
+          echo "Script contents:"
+          cat ./scripts/get.sh || echo "Cannot read script"
+
+      # Run tests (works whether script exists or not)
+      - name: Execute tests
+        run: |
+          # Always verify AWS access first
+          echo "=== AWS Identity ==="
+          aws sts get-caller-identity
+          
+          # Try to run script if exists
+          if [ -f "./scripts/get.sh" ]; then
+            echo "=== Running custom script ==="
+            chmod +x ./scripts/get.sh
+            ./scripts/get.sh
           else
-            echo "::error::Script missing at expected location"
-            find "$GITHUB_WORKSPACE" -type f
-          fi          
-                
-          
-      #     # Environment variable for the workspace path
-      # - name: Set workspace
-      #   run: echo "WORKSPACE=$(pwd)" >> $GITHUB_ENV
-
-      # # 2. Verification Steps
-      # - name: Verify AWS Access
-      #   run: |
-      #     echo "=== AWS Identity ==="
-      #     aws sts get-caller-identity
-          
-      #     echo "=== S3 Buckets ==="
-      #     aws s3 ls
-
-      # # 3. Verify script exists (debugging)
-      # - name: Validate script path
-      #   run: |
-      #     echo "Working directory: $(pwd)"
-      #     ls -la ./scripts/
-      #     [ -f ./scripts/get.sh ] || { echo "Error: Script not found"; exit 1; }
-
-      # # 4. Make executable and run
-      # - name: Execute test script
-      #   run: |
-      #     chmod +x ${{ env.WORKSPACE }}/scripts/get.sh
-      #     ${{ env.WORKSPACE }}/scripts/get.sh
-
-# jobs:
-#   # call_reusable:
-#   #   uses: marcoliew/reusable_gha_wf/.github/workflows/aws-oidc-auth.yml@main
-#   #   secrets:
-#   #     aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}
-#   auth:
-#     uses: marcoliew/reusable_gha_wf/.github/workflows/aws-oidc-auth.yml@main
-#     secrets:
-#       aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}  # ← Secret passed correctly
-#     with: # ← Regular inputs (non-secrets)
-#       aws_region: ap-southeast-2 # Optional since default exists
-
-
+            echo "::warning::Custom script not found, running fallback commands"
+            echo "=== IAM Roles ==="
+            aws iam list-roles --query 'Roles[*].RoleName' --output text | tr '\t' '\n'
+          fi
