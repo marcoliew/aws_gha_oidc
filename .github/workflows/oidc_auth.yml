@@ -14,31 +14,39 @@ permissions:
   contents: read    # This is required for actions/checkout
 
 jobs:
-  # call_reusable:
-  #   uses: marcoliew/reusable_gha_wf/.github/workflows/aws-oidc-auth.yml@main
-  #   secrets:
-  #     aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}
-  auth:
-    uses: marcoliew/reusable_gha_wf/.github/workflows/aws-oidc-auth.yml@main
-    secrets:
-      aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}  # ← Secret passed correctly
-    with: # ← Regular inputs (non-secrets)
-      aws_region: ap-southeast-2 # Optional since default exists
-  # secrets: inherit  # Or specify individual secrets
-
-  test:
+  auth-and-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify AWS access by listing S3 buckets
+      # 1. Configure AWS Credentials
+      - name: Assume AWS Role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-southeast-2
+
+      # 2. Verification Steps
+      - name: Verify AWS Access
         run: |
-          # List all S3 buckets (simple verification)
-          echo "=== Listing S3 buckets ==="
-          aws s3 ls
-          
-          # Optional: More detailed verification
-          echo "=== AWS caller identity ==="
+          echo "=== AWS Identity ==="
           aws sts get-caller-identity
-      
-      # - name: Run deployment script
-      #   run: chmod +x ./scripts/aws_deploy.sh && ./scripts/deploy.sh
+          
+          echo "=== S3 Buckets ==="
+          aws s3 ls
+
+      # 3. Add your deployment steps here
+      # - name: Deploy
+      #   run: ./deploy.sh
+
+# jobs:
+#   # call_reusable:
+#   #   uses: marcoliew/reusable_gha_wf/.github/workflows/aws-oidc-auth.yml@main
+#   #   secrets:
+#   #     aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}
+#   auth:
+#     uses: marcoliew/reusable_gha_wf/.github/workflows/aws-oidc-auth.yml@main
+#     secrets:
+#       aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}  # ← Secret passed correctly
+#     with: # ← Regular inputs (non-secrets)
+#       aws_region: ap-southeast-2 # Optional since default exists
+
 
