@@ -14,22 +14,35 @@ permissions:
   contents: read    # This is required for actions/checkout
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ap-southeast-2
-      - name: Verify AWS access by listing S3 buckets
-        run: |
-          # List all S3 buckets (simple verification)
-          echo "=== Listing S3 buckets ==="
-          aws s3 ls
+  call_reusable_workflow:
+    uses: marcoliew/reusable_gha_wf/.github/workflows/aws-oidc-auth.yml@main
+    with:
+      aws_role_arn: ${{ secrets.AWS_ROLE_ARN }}
+      aws_region: ap-southeast-1
+    secrets: inherit  # Or specify individual secrets
+
+  # deploy:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4    # Required to access scripts
+
+  #     - name: Configure AWS credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+  #         aws-region: ap-southeast-2
+
+  #     - name: Verify AWS access by listing S3 buckets
+  #       run: |
+  #         # List all S3 buckets (simple verification)
+  #         echo "=== Listing S3 buckets ==="
+  #         aws s3 ls
           
-          # Optional: More detailed verification
-          echo "=== AWS caller identity ==="
-          aws sts get-caller-identity
+  #         # Optional: More detailed verification
+  #         echo "=== AWS caller identity ==="
+  #         aws sts get-caller-identity
       
-      # Your deployment steps here
+  #     - name: Run deployment script
+  #       run: chmod +x ./scripts/aws_deploy.sh && ./scripts/deploy.sh
+
