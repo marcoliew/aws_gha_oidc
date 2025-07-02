@@ -33,12 +33,18 @@ jobs:
           echo "=== S3 Buckets ==="
           aws s3 ls
 
-      - name: Make script executable
-        run: chmod +x ./scripts/get.sh  # ← Correct path
+      # 3. Verify script exists (debugging)
+      - name: Validate script path
+        run: |
+          echo "Working directory: $(pwd)"
+          ls -la ./scripts/
+          [ -f ./scripts/get.sh ] || { echo "Error: Script not found"; exit 1; }
 
-      # 3. Add your test steps here
-      - name: Run Script
-        run: ./scripts/get.sh
+      # 4. Make executable and run
+      - name: Execute test script
+        run: |
+          chmod +x ./scripts/get.sh
+          ./scripts/get.sh
 
 # jobs:
 #   # call_reusable:
