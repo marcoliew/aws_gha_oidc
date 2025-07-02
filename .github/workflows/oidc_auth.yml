@@ -1,3 +1,9 @@
+name: AWS OIDC Authentication
+
+on:
+  push:
+    branches: [ main ]  # or your preferred branch
+
 permissions:
   id-token: write   # This is required for OIDC
   contents: read    # This is required for actions/checkout
