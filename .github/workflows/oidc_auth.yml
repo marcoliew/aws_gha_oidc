@@ -20,7 +20,16 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::058264095432:role/GHA-Trust
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ap-southeast-2
+      - name: Verify AWS access by listing S3 buckets
+        run: |
+          # List all S3 buckets (simple verification)
+          echo "=== Listing S3 buckets ==="
+          aws s3 ls
+          
+          # Optional: More detailed verification
+          echo "=== AWS caller identity ==="
+          aws sts get-caller-identity
       
       # Your deployment steps here
