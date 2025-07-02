@@ -49,7 +49,7 @@ jobs:
       # 3. Force Unix format and permissions
       - name: Normalize script
         run: |
-          dos2unix ./scripts/get.sh  # Convert line endings if needed
+          # dos2unix ./scripts/get.sh  # Convert line endings if needed
           chmod +x ./scripts/get.sh
           # Verify final state
           file ./scripts/get.sh
