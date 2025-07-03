@@ -43,8 +43,11 @@ jobs:
 
       - name: Run OWASP Dependency Check
         working-directory: mock-java-app
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: mvn org.owasp:dependency-check-maven:check
         continue-on-error: true
+
 
   deploy:
     name: Deploy (Dummy)
