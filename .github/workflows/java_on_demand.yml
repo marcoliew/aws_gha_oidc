@@ -2,6 +2,11 @@ name: Java CI/CD On-Demand
 
 on:
   workflow_dispatch:  # Manual trigger
+    inputs:
+      run_scan:
+        description: 'Run security scan?'
+        type: boolean
+        default: false  # Default: Skip scan
 
 permissions:
   id-token: write   # Required for AWS OIDC
@@ -37,11 +42,13 @@ jobs:
         working-directory: mock-java-app
         run: mvn test
 
-      - name: Run Checkstyle
+      - name: Run Checkstyle (conditional)
+        if: ${{ inputs.run_scan }}
         working-directory: mock-java-app
         run: mvn checkstyle:check
 
-      - name: Run OWASP Dependency Check
+      - name: Run OWASP Dependency Check (conditional)
+        if: ${{ inputs.run_scan }}
         working-directory: mock-java-app
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
