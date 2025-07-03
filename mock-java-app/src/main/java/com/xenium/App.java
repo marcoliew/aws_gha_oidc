@@ -3,7 +3,7 @@ package com.xenium;
 /**
  * Entry point for the application.
  */
-public class App {
+public final class App {
 
     /**
      * Main method to run the application.
@@ -14,7 +14,7 @@ public class App {
         System.out.println("Hello World!");
     }
 
-    // private constructor to prevent instantiation (if utility class)
+    // Private constructor to prevent instantiation
     private App() {
         // Prevent instantiation
     }
