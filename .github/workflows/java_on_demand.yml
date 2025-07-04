@@ -1,16 +1,16 @@
 name: Java CI/CD On-Demand
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger
     inputs:
       run_scan:
         description: 'Run security scan?'
         type: boolean
-        default: false
+        default: false  # Default: Skip scan
 
 permissions:
-  id-token: write
-  contents: read
+  id-token: write   # Required for AWS OIDC
+  contents: read    # Required for actions/checkout
 
 jobs:
   build-and-test:
@@ -19,13 +19,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Debug directory structure
-        run: |
-          echo "Workspace:"
-          ls -la
-          echo "mock-java-app:"
-          ls -la mock-java-app
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -54,7 +47,7 @@ jobs:
         working-directory: mock-java-app
         run: mvn checkstyle:check
 
-      # OWASP Dependency Check with verified paths
+      # OWASP Dependency Check with PROPER CACHE HANDLING
       - name: Cache OWASP Dependency-Check data
         if: ${{ inputs.run_scan }}
         uses: actions/cache@v3
@@ -63,12 +56,6 @@ jobs:
           key: ${{ runner.os }}-owasp-data-${{ hashFiles('mock-java-app/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-owasp-data-
-
-      - name: Verify OWASP cache path
-        if: ${{ inputs.run_scan }}
-        run: |
-          echo "Cache path:"
-          ls -la ~/.dependency-check/data || echo "No cache exists (normal first run)"
 
       - name: Run OWASP Dependency Check (conditional)
         if: ${{ inputs.run_scan }}
