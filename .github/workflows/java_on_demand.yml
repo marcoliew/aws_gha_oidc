@@ -63,16 +63,25 @@ jobs:
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
-          mvn org.owasp:dependency-check-maven:check || echo "⚠️ Dependency check failed (allowed to proceed)"
+          # Explicitly set report format and location
+          mvn org.owasp:dependency-check-maven:check \
+            -DdependencyCheck.outputDirectory=target/owasp-reports \
+            -DdependencyCheck.format=HTML \
+            -DdependencyCheck.htmlReportName=report.html
+          
+          # Verify report generation
+          echo "Generated reports:"
+          ls -la target/owasp-reports/
         continue-on-error: true
 
       - name: Upload OWASP Report
-        if: ${{ inputs.run_scan && (success() || failure()) }}
+        if: ${{ inputs.run_scan }}
         uses: actions/upload-artifact@v4
         with:
-          name: dependency-check-report
-          path: mock-java-app/target/dependency-check-report.html
+          name: security-report
+          path: mock-java-app/target/owasp-reports/report.html
           retention-days: 3
+          if-no-files-found: error
 
   deploy:
     name: Deploy (Dummy)
