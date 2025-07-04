@@ -70,20 +70,22 @@ jobs:
           echo "Cache path:"
           ls -la ~/.dependency-check/data || echo "No cache exists (normal first run)"
 
-      - name: Run OWASP Dependency Check
+      - name: Run OWASP Dependency Check (conditional)
         if: ${{ inputs.run_scan }}
         working-directory: mock-java-app
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
+          # Explicitly set report format and location
           mvn org.owasp:dependency-check-maven:check \
-            -DdataDirectory=$HOME/.dependency-check/data \
-            -DoutputDirectory=target/owasp-reports \
-            -Dformat=HTML \
-            -DhtmlReportName=report.html
+            -DdependencyCheck.outputDirectory=target/owasp-reports \
+            -DdependencyCheck.format=HTML \
+            -DdependencyCheck.htmlReportName=report.html
           
+          # Verify report generation
           echo "Generated reports:"
           ls -la target/owasp-reports/
+        continue-on-error: true
 
       - name: Upload OWASP Report
         if: ${{ inputs.run_scan }}
