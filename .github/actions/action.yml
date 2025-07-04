@@ -1,0 +1,14 @@
+name: 'Get Available Versions'
+description: 'Fetch recent git tags for workflow dropdown'
+outputs:
+  versions: ${{ steps.get-versions.outputs.versions }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: get-versions
+      shell: bash
+      run: |
+        # Fetch last 5 version tags (sorted newest first)
+        versions=$(git tag -l "v*" --sort=-v:refname | head -5 | jq -R -s -c 'split("\n")[:-1]')
+        echo "versions=${versions}" >> $GITHUB_OUTPUT

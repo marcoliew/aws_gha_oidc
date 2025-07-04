@@ -1,0 +1,57 @@
+name: Rollback Manager
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_version:
+        description: 'Version tag to rollback to (e.g., v1.2.3)'
+        required: true
+        type: string
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [stage, prod]
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment == 'prod' && 'production' || 'staging' }}
+    steps:
+      - name: Validate version exists
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for tag verification
+
+      - name: Verify tag
+        id: check-tag
+        run: |
+          if ! git rev-parse "${{ inputs.target_version }}"^{} >/dev/null 2>&1; then
+            echo "::error::Tag ${{ inputs.target_version }} does not exist!"
+            echo "::group::Available versions"
+            git tag -l "v*" --sort=-v:refname | head -5
+            echo "::endgroup::"
+            exit 1
+          fi
+
+      - name: Retag and deploy
+        if: steps.check-tag.conclusion == 'success'
+        run: |
+          git tag -f "ready-for-${{ inputs.environment }}" "${{ inputs.target_version }}"
+          git push origin "ready-for-${{ inputs.environment }}" --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log audit trail
+        run: |
+          echo "$(date -u) - Rolled back to ${{ inputs.target_version }} (${{ inputs.reason }})" \
+            >> .github/rollback-audit.log
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .github/rollback-audit.log
+          git commit -m "Audit: Rollback to ${{ inputs.target_version }}"
+          git push

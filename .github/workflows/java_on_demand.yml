@@ -1,22 +1,52 @@
 name: Java CI/CD On-Demand
 
 on:
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
     inputs:
       run_scan:
         description: 'Run security scan?'
         type: boolean
-        default: false  # Default: Skip scan
+        default: false
 
 permissions:
-  id-token: write   # Required for AWS OIDC
-  contents: read    # Required for actions/checkout
+  id-token: write  # Required for OIDC with Vault
+  contents: read
+
+env:
+  ARTIFACTORY_URL: https://your-artifactory.jfrog.io/artifactory
+  REPO_NAME: security-reports
+  VAULT_ADDR: https://your-vault-server:8200
 
 jobs:
   build-and-test:
     name: Build and Test
     runs-on: ubuntu-latest
     steps:
+      # ===== VAULT OIDC AUTHENTICATION =====
+      - name: Authenticate with Vault via OIDC
+        id: vault-auth
+        uses: hashicorp/vault-action@v2
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: gha-role
+          secrets: |
+            secret/data/owasp nvd_api_key | NVD_API_KEY ;
+            secret/data/artifactory creds | ARTIFACTORY_CREDS
+          exportEnv: false
+
+      - name: Parse Vault Secrets
+        id: parse-secrets
+        run: |
+          # Process NVD API Key
+          echo "NVD_API_KEY=$(jq -r '.data.data.nvd_api_key' <<< '${{ steps.vault-auth.outputs.NVD_API_KEY }}')" >> $GITHUB_ENV
+          
+          # Process Artifactory Creds
+          ARTIFACTORY_CREDS=$(jq -r '.data.data' <<< '${{ steps.vault-auth.outputs.ARTIFACTORY_CREDS }}')
+          echo "ARTIFACTORY_USER=$(jq -r '.username' <<< "$ARTIFACTORY_CREDS")" >> $GITHUB_ENV
+          echo "ARTIFACTORY_API_KEY=$(jq -r '.api_key' <<< "$ARTIFACTORY_CREDS")" >> $GITHUB_ENV
+
+      # ===== BUILD/TEST PIPELINE =====
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -42,63 +72,67 @@ jobs:
         working-directory: mock-java-app
         run: mvn test
 
+      - name: Upload Deployment Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-artifacts
+          path: |
+            mock-java-app/target/*.jar
+            mock-java-app/Dockerfile
+            mock-java-app/kubernetes/
+          retention-days: 3
+
+      # ===== SECURITY CHECKS =====
       - name: Run Checkstyle (conditional)
         if: ${{ inputs.run_scan }}
         working-directory: mock-java-app
         run: mvn checkstyle:check
 
-      # OWASP Dependency Check with PROPER CACHE HANDLING
-      - name: Cache OWASP Dependency-Check data
+      - name: OWASP Dependency Check
         if: ${{ inputs.run_scan }}
-        uses: actions/cache@v3
+        uses: OWASP/dependency-check-action@v3
         with:
-          path: ~/.dependency-check/data
-          key: ${{ runner.os }}-owasp-data-${{ hashFiles('mock-java-app/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-owasp-data-
-
-      - name: Run OWASP Dependency Check (conditional)
-        if: ${{ inputs.run_scan }}
-        working-directory: mock-java-app
+          project: 'mock-java-app'
+          scan-path: '**/*.jar'
+          format: 'HTML'
+          output-directory: 'target/owasp-reports'
         env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: |
-          # Explicitly set report format and location
-          mvn org.owasp:dependency-check-maven:check \
-            -DdependencyCheck.outputDirectory=target/owasp-reports \
-            -DdependencyCheck.format=HTML \
-            -DdependencyCheck.htmlReportName=report.html
-          
-          # Verify report generation
-          echo "Generated reports:"
-          ls -la target/owasp-reports/
-        continue-on-error: true
+          NVD_API_KEY: ${{ env.NVD_API_KEY }}
 
-      - name: Upload OWASP Report
+      - name: Upload Security Report to Artifactory
         if: ${{ inputs.run_scan }}
-        uses: actions/upload-artifact@v4
+        uses: jfrog/upload-artifact@v3
         with:
-          name: security-report
-          path: mock-java-app/target/owasp-reports/report.html
-          retention-days: 3
-          if-no-files-found: error
+          target: "${{ env.ARTIFACTORY_URL }}/${{ env.REPO_NAME }}"
+          source: "mock-java-app/target/owasp-reports/report.html"
+          target-path: "dependency-check-${{ github.run_id }}.html"
+        env:
+          JF_URL: ${{ env.ARTIFACTORY_URL }}
+          JF_USER: ${{ env.ARTIFACTORY_USER }}
+          JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_API_KEY }}
 
-  deploy:
-    name: Deploy (Dummy)
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+      # ===== DEBUGGING =====
+      - name: Verify Artifacts
+        if: ${{ inputs.run_scan }}
+        run: |
+          echo "Generated reports:"
+          ls -la mock-java-app/target/owasp-reports/
+          echo "Vault secrets:"
+          echo "NVD_API_KEY: ${NVD_API_KEY:0:4}... (truncated)"
+          echo "ARTIFACTORY_USER: $ARTIFACTORY_USER"
+
+      # ===== TRIGGER DEPLOY =====
+      - name: Trigger Deployment
+        uses: actions/github-script@v6
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ap-southeast-2
-
-      - name: Verify AWS access
-        run: aws sts get-caller-identity
-
-      - name: Dummy deploy step
-        run: echo "🚀 Deploying app from mock-java-app..."
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy.yml',
+              ref: context.ref,
+              inputs: {
+                build_run_id: '${{ github.run_id }}'
+              }
+            })

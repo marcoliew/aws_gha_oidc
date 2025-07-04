@@ -1,0 +1,32 @@
+git log --oneline
+
+git tag v0.9.0 d4e5f6g  # Tags commit 'd4e5f6g'
+git push origin v0.9.0
+
+git tag v0.8.0 HEAD~3  # Tags the commit 3 steps back
+git push origin v0.8.0
+
+# Tag a commit from a feature branch
+git tag v1.0.0-beta feature-branch~2
+git push origin v1.0.0-beta
+
+git show-ref --tags
+# Output:
+# d4e5f6g refs/tags/v0.9.0
+# a1b2c3d refs/tags/v1.0.0
+
+
+git show v0.9.0
+
+git push origin v1.0.0
+
+git push origin --tags
+
+# Force-update an existing tag
+git tag -f v1.0.0 a1b2c3d  # Reassign to commit 'a1b2c3d'
+git push origin --force v1.0.0  # Overwrite remote tag
+
+git tag -d stable           # Delete local tag
+git push origin :stable     # Delete remote tag
+git tag stable new-commit   # Reassign
+git push origin stable      # Push updated tag

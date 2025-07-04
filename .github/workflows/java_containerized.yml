@@ -1,0 +1,127 @@
+name: Java Container CI/CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_scan:
+        description: 'Run security scans?'
+        type: boolean
+        default: true
+      deploy_target:
+        description: 'Deployment target'
+        type: choice
+        options: [none, ec2, ecs, eks]
+        default: 'none'
+
+env:
+  APP_IMAGE: ghcr.io/${{ github.repository }}
+  REGISTRY_URL: ghcr.io  # Added for deployment consistency
+
+jobs:
+  container-build:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.set-tag.outputs.value }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ===== CONTAINERIZED BUILD & TEST =====
+      - name: Run Build and Quality Checks
+        run: |
+          docker run --rm \
+            -v $PWD:/app \
+            -w /app/mock-java-app \
+            -e MAVEN_CONFIG=/var/maven/.m2 \
+            -v maven-repo:/var/maven/.m2 \
+            maven:3.8.6-eclipse-temurin-17 \
+            mvn -B verify checkstyle:check
+
+      # ===== SECURITY SCANS =====
+      - name: OWASP Dependency Check
+        if: ${{ inputs.run_scan }}
+        run: |
+          docker run --rm \
+            -v $PWD:/app \
+            -w /app/mock-java-app \
+            owasp/dependency-check:latest \
+            --scan ./target \
+            --format HTML \
+            --out ./target/owasp-reports \
+            --project "Java App"
+
+      # ===== IMAGE BUILDING =====
+      - name: Set Image Tag
+        id: set-tag
+        run: echo "value=${{ github.sha }}-$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Build Production Image
+        working-directory: mock-java-app
+        run: |
+          docker build \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            -t ${{ env.APP_IMAGE }}:${{ steps.set-tag.outputs.value }} .
+
+      - name: Trivy Container Scan
+        if: ${{ inputs.run_scan }}
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.APP_IMAGE }}:${{ steps.set-tag.outputs.value }}
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+
+      - name: Login to GHCR
+        if: ${{ inputs.deploy_target != 'none' }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Image
+        if: ${{ inputs.deploy_target != 'none' }}
+        run: |
+          docker push ${{ env.APP_IMAGE }}:${{ steps.set-tag.outputs.value }}
+
+  deploy:
+    needs: container-build
+    if: ${{ inputs.deploy_target != 'none' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        if: ${{ contains('ec2,ecs,eks', inputs.deploy_target) }}
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to ${{ inputs.deploy_target }}
+        env:
+          IMAGE_REF: ${{ env.APP_IMAGE }}:${{ needs.container-build.outputs.image_tag }}
+        run: |
+          case "${{ inputs.deploy_target }}" in
+            ec2)
+              ssh -i $SSH_KEY ubuntu@$EC2_HOST \
+                "docker pull $IMAGE_REF && \
+                 docker stop java-app || true && \
+                 docker run -d -p 80:8080 --name java-app $IMAGE_REF"
+              ;;
+            ecs)
+              aws ecs update-service \
+                --cluster my-cluster \
+                --service java-app \
+                --force-new-deployment \
+                --query "service.deployments[0].id"
+              ;;
+            eks)
+              kubectl set image deployment/java-app \
+                java-app=$IMAGE_REF \
+                --record
+              ;;
+          esac
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}

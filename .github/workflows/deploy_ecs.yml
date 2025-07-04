@@ -1,0 +1,7 @@
+- name: Deploy to ECS
+  run: |
+    aws ecs update-service \
+      --cluster my-cluster \
+      --service java-app \
+      --force-new-deployment \
+      --query "service.deployments[0].id"

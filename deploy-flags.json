@@ -1,0 +1,4 @@
+{
+  "enable-staging": true,
+  "enable-prod": false
+}

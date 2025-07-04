@@ -1,0 +1,6 @@
+- name: Deploy to Kubernetes
+  run: |
+    kubectl apply -f k8s/deployment.yaml
+    kubectl rollout status deployment/java-app --timeout=90s
+  env:
+    KUBECONFIG: ${{ secrets.KUBE_CONFIG }}

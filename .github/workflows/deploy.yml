@@ -1,0 +1,27 @@
+on:
+  workflow_call:
+    inputs:
+      build_run_id:
+        description: 'Source workflow run ID'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: java-artifacts
+          path: deploy-package
+          workflow_run_id: ${{ inputs.build_run_id }}
+
+      - name: Verify Files
+        run: |
+          echo "Downloaded artifacts:"
+          ls -R deploy-package/
+
+      - name: Deploy to EC2
+        run: ./scripts/deploy.sh
+        working-directory: deploy-package

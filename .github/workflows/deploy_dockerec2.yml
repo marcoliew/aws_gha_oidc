@@ -1,0 +1,12 @@
+- name: Deploy to EC2 via SSH
+  run: |
+    ssh ubuntu@$EC2_HOST <<EOF
+      docker pull ${{ env.REGISTRY_URL }}/java-app:${{ github.sha }}
+      docker stop java-app || true
+      docker run -d --rm -p 80:8080 \
+        --name java-app \
+        ${{ env.REGISTRY_URL }}/java-app:${{ github.sha }}
+    EOF
+  env:
+    EC2_HOST: ${{ secrets.EC2_HOST }}
+    SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
