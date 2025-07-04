@@ -47,22 +47,32 @@ jobs:
         working-directory: mock-java-app
         run: mvn checkstyle:check
 
-      - name: Run OWASP Dependency Check (conditional)
-        if: ${{ inputs.run_scan }}
-        working-directory: mock-java-app
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: | 
-          mvn org.owasp:dependency-check-maven:check || echo "⚠️ Dependency check failed (allowed to proceed)"
-        continue-on-error: true
-
+      # OWASP Dependency Check with PROPER CACHE HANDLING
       - name: Cache OWASP Dependency-Check data
         if: ${{ inputs.run_scan }}
         uses: actions/cache@v3
         with:
           path: ~/.dependency-check/data
           key: ${{ runner.os }}-owasp-data-${{ hashFiles('mock-java-app/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-owasp-data-
 
+      - name: Run OWASP Dependency Check (conditional)
+        if: ${{ inputs.run_scan }}
+        working-directory: mock-java-app
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          mvn org.owasp:dependency-check-maven:check || echo "⚠️ Dependency check failed (allowed to proceed)"
+        continue-on-error: true
+
+      - name: Upload OWASP Report
+        if: ${{ inputs.run_scan && (success() || failure()) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: mock-java-app/target/dependency-check-report.html
+          retention-days: 3
 
   deploy:
     name: Deploy (Dummy)
